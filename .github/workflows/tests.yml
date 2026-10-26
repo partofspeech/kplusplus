@@ -1,0 +1,50 @@
+name: Tests without source credentials
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    name: Offline tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      PYTHONUTF8: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install application and tests
+        run: python -m pip install -e '.[test]'
+      - name: Unit tests and recorded decision tests
+        run: python -m pytest tests --ignore=tests/offline -p no:cacheprovider -q --junitxml=artifacts/unit-tests.xml
+      - name: Install Chromium and Linux dependencies
+        if: runner.os == 'Linux'
+        run: python -m playwright install --with-deps chromium
+      - name: Install Chromium on macOS
+        if: runner.os == 'macOS'
+        run: python -m playwright install chromium
+      - name: Replay saved content in Chromium without website access
+        env:
+          SCRAPER_OFFLINE_BROWSER_TESTS: '1'
+        run: python -m pytest tests/offline -p no:cacheprovider -q --junitxml=artifacts/offline-browser-tests.xml
+      - name: Save test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ runner.os }}
+          path: artifacts/
