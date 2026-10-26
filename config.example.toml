@@ -1,0 +1,29 @@
+# Скопируйте в config.toml. Файл с реквизитами не добавляйте в Git.
+[scraper]
+sources = ["consultantplus", "sudact"] # источники запускаются по порядку; заглушки пропускаются
+
+[search]
+query = 'Федеральный закон от 25.07.2002 N 113-ФЗ "Об альтернативной гражданской службе"'
+
+[export]
+directory = "output"
+overwrite = false
+# Режимы CLI задаются аргументами --debug и --http / --no-http.
+slow_mo_ms = 100
+timeout_seconds = 45
+
+# Только настройки выбранного источника. Общие модули не разбирают эти поля.
+[sources.consultantplus]
+name = "Консультант+"
+# Переменные окружения имеют приоритет при запуске CLI.
+login = "${CONSULTANT_LOGIN}"
+password = "${CONSULTANT_PASSWORD}"
+court_scope = "available" # available | all
+all_courts_open_selector = ""
+all_courts_option_selector = ""
+search_input_selector = ".x-page-components-search-panel__filter"
+search_submit_selector = ".x-page-components-search-panel__button"
+manual_intervention_timeout_seconds = 300
+
+[sources.sudact]
+name = "Судакт.ру"

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="app-token" content="__APP_TOKEN__">
+  <title>Kplusplus · Судебная практика</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header><a class="brand" href="/" aria-label="Kplusplus — главная">k<span>++</span></a><span class="local"><i></i> Локальное приложение</span></header>
+    <main>
+      <div class="layout">
+        <section class="card form-card" aria-labelledby="settings-title">
+          <div class="section-heading"><span class="step">01</span><h2 id="settings-title">Параметры поиска</h2></div>
+          <form id="parser-form">
+            <fieldset id="settings">
+              <label for="login">Логин источника</label>
+              <input id="login" name="login" autocomplete="username" placeholder="Телефон или логин" maxlength="2000">
+              <label for="password">Пароль</label>
+              <div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Ваш пароль" maxlength="2000"><button type="button" id="show-password" aria-label="Показать пароль" aria-pressed="false">Показать</button></div>
+              <p class="hint">Пароль используется только для текущего запуска и не сохраняется приложением.</p>
+              <label for="law">Федеральный закон для поиска</label>
+              <textarea id="law" name="law" rows="3" required maxlength="2000" placeholder='Например: Федеральный закон от 25.07.2002 N 113-ФЗ «Об альтернативной гражданской службе»'></textarea>
+              <p class="hint">Укажите номер, дату и название закона для более точного поиска.</p>
+              <label for="save-directory">Папка для сохранения</label>
+              <input id="save-directory" readonly aria-describedby="save-hint" value="Загрузка…">
+              <button type="button" id="choose-folder" class="secondary choose-folder">Выбрать папку…</button>
+              <p class="hint" id="save-hint">Документы и общая таблица сохраняются прямо в выбранную папку. При повторном запуске готовые документы пропускаются.</p>
+              <label class="debug-option" for="overwrite"><span><strong>Перезаписывать существующие файлы</strong><small>Повторно сохранить документы и обновить их строки в таблице</small></span><input id="overwrite" type="checkbox" role="switch"></label>
+              <label class="debug-option" for="hybrid"><span><strong>Пробный HTTP-режим</strong><small>Проверять получение полного текста через HTTP</small></span><input id="hybrid" type="checkbox" role="switch"></label>
+              <p class="hint">При неполном ответе текст берётся из браузера. Авторизация и выход выполняются через Chromium.</p>
+              <label class="debug-option" for="debug"><span><strong>Режим отладки</strong><small>Показывать окно Chromium во время работы</small></span><input id="debug" name="debug" type="checkbox" role="switch"></label>
+              <p class="hint">Если потребуется код входа или CAPTCHA, включите отладку и повторите запуск.</p>
+            </fieldset>
+            <button class="primary" type="submit" id="start">Начать выгрузку <span aria-hidden="true">↗</span></button>
+          </form>
+        </section>
+        <section class="card result-card" aria-labelledby="result-title">
+          <div class="section-heading"><span class="step">02</span><h2 id="result-title">Результат</h2><span id="badge">Ожидание</span></div>
+          <div class="status-block" aria-live="polite"><div class="status-icon" id="status-icon" aria-hidden="true">↓</div><h3 id="phase">Всё готово к запуску</h3><p id="description">Документы появятся здесь после начала выгрузки.</p></div>
+          <div class="counters"><div><strong id="saved">0</strong><span>Сохранено актов</span></div><div><strong id="skipped">0</strong><span>Пропущено</span></div></div>
+          <p id="error" class="error" role="alert" hidden></p>
+          <p id="transport-summary" class="hint" aria-live="polite"></p>
+          <p id="logout" class="hint" aria-live="polite"></p>
+          <div class="folder"><span class="eyebrow">ПАПКА ЗАГРУЗОК</span><p id="directory">Загрузка…</p><button id="open-folder" class="secondary" type="button">Открыть папку <span aria-hidden="true">↗</span></button></div>
+          <button id="stop" class="stop" type="button" hidden>Остановить и выйти из системы</button>
+        </section>
+      </div>
+      <footer><span>DOCX-документы + таблица CSV</span><span>Объём выгрузки зависит от доступа вашей учётной записи.</span></footer>
+    </main>
+  </div>
+</body>
+</html>
