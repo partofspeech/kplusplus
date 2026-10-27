@@ -27,3 +27,12 @@ def test_retains_lock_of_live_process(tmp_path):
     with pytest.raises(RuntimeError, match='уже работает'):
         acquire_lock(path)
     assert path.read_text() == str(os.getpid())
+
+
+def test_native_process_check_detects_child_exit():
+    import subprocess
+    import sys
+    with subprocess.Popen([sys.executable, '-c', 'import sys; sys.stdin.read()'], stdin=subprocess.PIPE) as process:
+        assert process_alive(process.pid)
+        process.communicate(timeout=10)
+        assert not process_alive(process.pid)

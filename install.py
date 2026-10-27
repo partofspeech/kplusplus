@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Установка приложения на macOS и Linux. Нужен Python 3.11+."""
+"""Установка приложения на Windows, macOS и Linux. Нужен Python 3.11+."""
 from __future__ import annotations
 
 import argparse
@@ -12,11 +12,11 @@ import sys
 from datetime import datetime
 
 MIN_PYTHON = (3, 11)
-SUPPORTED_SYSTEMS = {'Darwin', 'Linux'}
+SUPPORTED_SYSTEMS = {'Windows', 'Darwin', 'Linux'}
 
 
 def environment_python(environment_dir: Path, system: str) -> Path:
-    return environment_dir / 'bin/python'
+    return environment_dir / ('Scripts/python.exe' if system == 'Windows' else 'bin/python')
 
 
 def environment_is_usable(python: Path, environment_dir: Path, system: str) -> bool:
@@ -33,6 +33,8 @@ def environment_is_usable(python: Path, environment_dir: Path, system: str) -> b
 
 
 def command_text(command: list[str]) -> str:
+    if platform.system() == 'Windows':
+        return subprocess.list2cmdline(command)
     return shlex.join(command)
 
 
@@ -73,8 +75,9 @@ def install(root: Path, *, system: str | None = None, dev: bool = False,
     browser_command.append('chromium')
     run_step('Устанавливаем Chromium', browser_command, root, dry_run=dry_run)
 
+    gui_check = 'import tkinter; ' if system == 'Windows' else ''
     run_step('Проверяем импорты и запуск Chromium без авторизации', [str(python), '-c',
-             'import interfaces.cli, interfaces.web.app, scraper.runner; '
+             gui_check + 'import interfaces.cli, interfaces.web.app, scraper.runner; '
              'from playwright.sync_api import sync_playwright; '
              '\nwith sync_playwright() as p:\n    browser = p.chromium.launch(headless=True)\n    browser.close()'],
              root, dry_run=dry_run)

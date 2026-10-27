@@ -41,7 +41,9 @@ def validate_input(data: dict) -> dict:
 
 def open_folder(path: Path):
     path.mkdir(parents=True, exist_ok=True)
-    if sys.platform == 'darwin':
+    if sys.platform == 'win32':
+        os.startfile(str(path))
+    elif sys.platform == 'darwin':
         subprocess.Popen(['open', str(path)])
     else:
         subprocess.Popen(['xdg-open', str(path)])
@@ -54,8 +56,8 @@ def choose_folder() -> Path | None:
                   'on error number -128\nreturn ""\nend try')
         command = ['osascript', '-e', script]
     else:
-        # A separate process gives Tk its own main thread on Linux.
-        command = [sys.executable, '-m', 'interfaces.web.folder_picker']
+        # A separate process gives Tk its own main thread on Windows/Linux.
+        command = [sys.executable, '-X', 'utf8', '-m', 'interfaces.web.folder_picker']
     result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8')
     if result.returncode:
         raise ValueError('Не удалось открыть окно выбора папки. Проверьте доступность системного интерфейса.')
@@ -105,7 +107,7 @@ class Jobs:
                            'slow_mo_ms': 100 if values['debug'] else 0, 'overwrite': values['overwrite']},
             }
             process = subprocess.Popen(
-                [sys.executable, '-u', '-m', 'interfaces.web.worker'],
+                [sys.executable, '-X', 'utf8', '-u', '-m', 'interfaces.web.worker'],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                 text=True, encoding='utf-8', cwd=str(self.root),
             )
@@ -259,7 +261,7 @@ def main():
         server.jobs.stop()
         process = server.jobs.process
         if process and process.poll() is None:
-            # Cooperative stop preserves server logout.
+            # Cooperative stop preserves server logout on Windows as well.
             process.wait()
         server.server_close()
 

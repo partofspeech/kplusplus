@@ -7,7 +7,7 @@ import pytest
 import install as installer
 
 
-@pytest.mark.parametrize('system', ['Darwin', 'Linux'])
+@pytest.mark.parametrize('system', ['Windows', 'Darwin', 'Linux'])
 def test_install_plans_dependencies_for_each_os_and_preserves_config(tmp_path, monkeypatch, system):
     config = tmp_path / 'config.toml'
     config.write_text('личные настройки', encoding='utf-8')
@@ -16,7 +16,7 @@ def test_install_plans_dependencies_for_each_os_and_preserves_config(tmp_path, m
     monkeypatch.setattr(installer, 'environment_is_usable', lambda *args: False)
     installer.install(tmp_path, system=system, dev=True)
     commands = [call.args[1] for call in execute.call_args_list]
-    expected_python = tmp_path / '.venv' / 'bin/python'
+    expected_python = tmp_path / '.venv' / ('Scripts/python.exe' if system == 'Windows' else 'bin/python')
     assert commands[0][1:3] == ['-m', 'venv']
     assert commands[1] == [str(expected_python), '-m', 'pip', 'install', '-e', str(tmp_path) + '[test]']
     assert ('--with-deps' in commands[2]) is (system == 'Linux')
@@ -42,7 +42,7 @@ def test_incompatible_environment_is_backed_up_instead_of_deleted(tmp_path, monk
     (tmp_path / 'config.toml').write_text('config')
     monkeypatch.setattr(installer, 'environment_is_usable', lambda *args: False)
     monkeypatch.setattr(installer, 'run_step', Mock())
-    installer.install(tmp_path, system='Darwin')
+    installer.install(tmp_path, system='Windows')
     backups = list(tmp_path.glob('.venv.backup-*'))
     assert len(backups) == 1
     assert (backups[0] / 'preserve-me').read_text() == 'old environment'
@@ -71,12 +71,12 @@ def test_linux_system_dependencies_can_be_skipped(tmp_path, monkeypatch):
     assert '--with-deps' not in execute.call_args_list[1].args[1]
 
 
-@pytest.mark.parametrize('version,system,expected', [([3, 12], 'Darwin', True), ([3, 10], 'Darwin', False), ([3, 12], 'Linux', False)])
+@pytest.mark.parametrize('version,system,expected', [([3, 12], 'Windows', True), ([3, 10], 'Windows', False), ([3, 12], 'Linux', False)])
 def test_existing_environment_version_and_os_are_checked(tmp_path, monkeypatch, version, system, expected):
     environment = tmp_path / '.venv'
-    python = environment / 'bin' / 'python'
+    python = environment / 'Scripts' / 'python.exe'
     python.parent.mkdir(parents=True)
     python.touch()
     probe = SimpleNamespace(returncode=0, stdout=json.dumps([version, str(environment), system]))
     monkeypatch.setattr(installer.subprocess, 'run', Mock(return_value=probe))
-    assert installer.environment_is_usable(python, environment, 'Darwin') is expected
+    assert installer.environment_is_usable(python, environment, 'Windows') is expected

@@ -55,7 +55,7 @@ def test_never_fetches_cross_origin_or_unobserved_scheme():
     context.request.get.assert_not_called()
 
 
-@pytest.mark.parametrize('charset', ['utf-8', 'cp1251'])
+@pytest.mark.parametrize('charset', ['utf-8', 'windows-1251'])
 def test_decodes_cyrillic_in_http_response(charset):
     assert decode_document(TEXT.encode(charset), f'text/plain; charset={charset}') == TEXT
     html = f'<meta charset="{charset}"><p>{TEXT}</p>'

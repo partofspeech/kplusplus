@@ -8,7 +8,7 @@ def test_removes_summary_controls_and_document_counter():
     assert clean_decision_text(source) == 'ОПРЕДЕЛЕНИЕ\n\nТекст решения\nПредседатель\nВ.Д.ЗОРЬКИН'
 
 
-def test_cleanup_handles_spaces_case_and_crlf_newlines():
+def test_cleanup_handles_spaces_case_and_windows_newlines():
     source = '\tКРАТКИЙ ПЕРЕСКАЗ\r\nДокумент:  12 / 190\r\nРЕШЕНИЕ'
     assert clean_decision_text(source) == 'РЕШЕНИЕ'
 

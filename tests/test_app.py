@@ -41,6 +41,7 @@ def test_job_passes_headless_and_credentials_over_stdin(tmp_path, monkeypatch, d
     jobs.start({'login': 'client', 'password': 'sensitive', 'law': 'N-113-ФЗ', 'debug': debug})
     payload = json.loads(process.stdin.getvalue())
     assert payload['config']['export']['headless'] is (not debug)
+    assert popen.call_args.args[0][1:3] == ['-X', 'utf8']
     assert payload['config']['export']['directory'] == str(tmp_path / 'output')
     assert payload['config']['export']['overwrite'] is False
     assert payload['config']['sources']['consultantplus']['password'] == 'sensitive'
@@ -55,14 +56,19 @@ def test_job_passes_headless_and_credentials_over_stdin(tmp_path, monkeypatch, d
     assert jobs.snapshot()['running']  # logout completes before the UI unlocks
 
 
-@pytest.mark.parametrize('platform,command', [('darwin', 'open'), ('linux', 'xdg-open')])
+@pytest.mark.parametrize('platform,command', [('win32', None), ('darwin', 'open'), ('linux', 'xdg-open')])
 def test_native_folder_opener(tmp_path, monkeypatch, platform, command):
     monkeypatch.setattr('interfaces.web.app.sys.platform', platform)
+    windows_open = Mock()
     popen = Mock()
+    monkeypatch.setattr('interfaces.web.app.os.startfile', windows_open, raising=False)
     monkeypatch.setattr('interfaces.web.app.subprocess.Popen', popen)
     folder = tmp_path / 'Документы с пробелами'
     open_folder(folder)
-    popen.assert_called_once_with([command, str(folder)])
+    if command:
+        popen.assert_called_once_with([command, str(folder)])
+    else:
+        windows_open.assert_called_once_with(str(folder))
     assert folder.is_dir()
 
 
@@ -148,7 +154,7 @@ def test_cancel_folder_dialog_keeps_previous_selection(tmp_path, monkeypatch):
     assert jobs.snapshot() == before
 
 
-@pytest.mark.parametrize('platform', ['darwin', 'linux'])
+@pytest.mark.parametrize('platform', ['darwin', 'win32', 'linux'])
 def test_native_folder_selection(tmp_path, monkeypatch, platform):
     from interfaces.web.app import choose_folder
     destination = tmp_path / 'Папка с пробелами'

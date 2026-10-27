@@ -1,4 +1,4 @@
-"""Native folder dialog in its own main thread (Linux)."""
+"""Native folder dialog in its own main thread (Windows/Linux)."""
 from __future__ import annotations
 
 

@@ -13,6 +13,7 @@ output/
 notice-doc.png
 notice-debug.html
 
+.venv-windows-tests/
 artifacts/
 .kplusplus.sqlite3*
 
