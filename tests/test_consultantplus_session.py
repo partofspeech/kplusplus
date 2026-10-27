@@ -48,3 +48,24 @@ def test_session_reports_unconfirmed_logout(caplog):
     session.logout = Mock(return_value=False)
     assert session.logout_all() is False
     assert 'Выход из КонсультантПлюс не подтверждён' in caplog.text
+
+
+@pytest.mark.parametrize('confirmed', [True, False])
+def test_logout_checks_login_endpoint_after_home_redirect(monkeypatch, confirmed):
+    from playwright.sync_api import TimeoutError
+    from scraper.consultantplus.session import LOGIN_URL
+
+    page, button = Mock(), Mock()
+    monkeypatch.setattr('scraper.consultantplus.session.first_visible', lambda *args: button)
+    password = page.locator.return_value.first
+    password.wait_for.side_effect = [TimeoutError('home page'), None if confirmed else TimeoutError('still logged in')]
+    session = ConsultantPlusSession(Mock(), config())
+    session._status = Mock()
+
+    assert session.logout(page) is confirmed
+    button.click.assert_called_once()
+    page.goto.assert_called_once_with(LOGIN_URL, wait_until='domcontentloaded', timeout=session.config.timeout_ms)
+    if confirmed:
+        session._status.assert_called_once_with('logged-out')
+    else:
+        session._status.assert_not_called()

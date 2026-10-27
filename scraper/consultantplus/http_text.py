@@ -7,6 +7,7 @@ import re
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
 
+from .text import clean_decision_text
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +86,20 @@ def verified_http_text(context, url: str, browser_url: str, rendered_text: str, 
             parser = DocumentHTML()
             parser.feed(text)
             text = ''.join(parser.parts).strip()
-        # Exact content comparison tolerates paragraph/space representation only.
-        if ' '.join(text.split()) != ' '.join(rendered_text.split()):
-            logger.debug('HTTP-текст не совпадает с браузерным; используем браузерный текст')
+        # Compare the content that will actually be saved. Service headers may
+        # differ after the browser initializes the document (e.g. its counter).
+        http_content = ' '.join(clean_decision_text(text).split())
+        browser_content = ' '.join(clean_decision_text(rendered_text).split())
+        if not http_content or http_content != browser_content:
+            difference = next(
+                (index for index, (left, right) in enumerate(zip(http_content, browser_content)) if left != right),
+                min(len(http_content), len(browser_content)),
+            )
+            logger.debug(
+                'HTTP-проверка: содержимое различается (HTTP: %d символов, браузер: %d; '
+                'первое различие: %d). Сохраняем браузерный текст.',
+                len(http_content), len(browser_content), difference,
+            )
             return None
         logger.debug('Полный текст подтверждён через HTTP')
         return text

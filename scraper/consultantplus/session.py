@@ -48,7 +48,7 @@ class ConsultantPlusSession:
     def _status(self, phase: str) -> None:
         if phase != "logged-out":
             self._check_cancelled()
-        logger.debug('Этап: %s', phase, extra={'phase': phase})
+        logger.debug('Этап: %s', phase, extra={'phase': phase, 'source': self.config.source})
         if self.status_path:
             self.status_path.write_text(phase + "\n", encoding="utf-8")
 
@@ -174,9 +174,18 @@ class ConsultantPlusSession:
         if not logout:
             return False
         logout.click()
-        page.locator("#loginform-password, input[name='password'], input[autocomplete='current-password']").first.wait_for(
-            state="visible", timeout=self.config.timeout_ms
-        )
+        password = page.locator("#loginform-password, input[name='password'], input[autocomplete='current-password']").first
+        try:
+            password.wait_for(state="visible", timeout=min(self.config.timeout_ms, 5_000))
+        except PlaywrightTimeoutError:
+            # The application may return to its home page after logout rather
+            # than displaying the login form. Check the authentication endpoint
+            # in the same context; navigation alone does not confirm logout.
+            page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=self.config.timeout_ms)
+            try:
+                password.wait_for(state="visible", timeout=self.config.timeout_ms)
+            except PlaywrightTimeoutError:
+                return False
         self._status("logged-out")
         return True
 

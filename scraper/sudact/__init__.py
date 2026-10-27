@@ -21,3 +21,8 @@ class SudactScraper:
 
 
 Scraper = SudactScraper
+
+requires_credentials = False
+
+ui_icon = 'scales'
+ui_description = 'Открытые акты'

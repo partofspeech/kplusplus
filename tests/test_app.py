@@ -201,3 +201,83 @@ def test_docx_preserves_decision_text_before_reference_panel(tmp_path, monkeypat
         assert row['Название документа'] == 'Название из К+'
         assert row['Текст решения'] == content
         assert row['Примечание'] == 'Примечание К+'
+
+
+def test_form_accepts_multiple_sources_and_ner_stub():
+    values = validate_input({'sources': ['consultantplus', 'sudact'], 'login': 'test', 'password': 'secret',
+                             'law': '113-ФЗ', 'ner': {'enabled': True, 'method': 'openai', 'fields': ['court']}})
+    assert values['sources'] == ['consultantplus', 'sudact']
+    assert values['ner']['enabled'] is True
+    assert values['ner']['fields'] == ['court']
+    assert values['transport'] == 'browser'
+
+
+def test_open_source_form_does_not_require_credentials():
+    values = validate_input({'sources': ['sudact'], 'law': '113-ФЗ'})
+    assert values['all_source_options'] == {'sudact': {}}
+
+
+def test_api_options_never_exposes_credentials(tmp_path):
+    handler = make_handler(tmp_path, '/api/options')
+    handler.do_GET()
+    response = json.loads(handler.wfile.getvalue())
+    assert [source['id'] for source in response['sources']] == ['consultantplus', 'sudact']
+    assert response['ner']['available'] is False
+    assert 'password' not in response
+    assert 'api_key' not in response
+
+
+def test_documents_tab_reads_real_csv_columns_only(tmp_path):
+    import csv
+    output = tmp_path / 'output'
+    output.mkdir()
+    with (output / 'судакты.csv').open('w', encoding='utf-8-sig', newline='') as stream:
+        writer = csv.DictWriter(stream, fieldnames=['Название документа', 'Источник', 'Источник парсинга', 'Текст решения'])
+        writer.writeheader()
+        writer.writerow({'Название документа': 'Определение', 'Источник': 'https://example.test/doc',
+                         'Источник парсинга': 'Тестовый источник', 'Текст решения': 'Большой полный текст'})
+    handler = make_handler(tmp_path, '/api/documents')
+    handler.do_GET()
+    assert json.loads(handler.wfile.getvalue()) == {'documents': [
+        {'title': 'Определение', 'url': 'https://example.test/doc', 'source': 'Тестовый источник'}]}
+
+
+def test_worker_events_update_real_progress_and_session_history(tmp_path):
+    events = [
+        {'type': 'status', 'phase': 'starting', 'source': 'one'},
+        {'type': 'log', 'level': 'DEBUG', 'message': 'Найдено актов: 3', 'event': 'documents_found', 'count': 3, 'source': 'one'},
+        {'type': 'status', 'phase': 'saved:1', 'source': 'one'},
+        {'type': 'status', 'phase': 'skipped:1', 'source': 'one'},
+        {'type': 'log', 'level': 'WARNING', 'message': 'Таймаут', 'event': 'document_error', 'source': 'one'},
+        {'type': 'result', 'saved': 1, 'skipped': 1, 'logout_confirmed': True},
+    ]
+    process = Mock()
+    process.stdout = io.StringIO(''.join(json.dumps(event) + '\n' for event in events))
+    process.stdin = io.StringIO()
+    jobs = Jobs(tmp_path)
+    jobs.state.update(running=True, run_id=1)
+    jobs._read(process)
+    state = jobs.snapshot()
+    assert state['found'] == 3
+    assert state['saved'] == 1
+    assert state['skipped'] == 1
+    assert state['failed'] == 1
+    assert len(state['logs']) == 2
+    assert not state['running']
+    assert jobs.history[0]['phase'] == 'done'
+
+
+def test_form_passes_ner_settings_to_worker_without_exposing_api_key(tmp_path, monkeypatch):
+    process = SimpleNamespace(stdin=io.StringIO(), stdout=io.StringIO(), poll=lambda: None)
+    monkeypatch.setattr('interfaces.web.app.subprocess.Popen', Mock(return_value=process))
+    monkeypatch.setattr('interfaces.web.app.threading.Thread', Mock())
+    jobs = Jobs(tmp_path)
+    jobs.start({'sources': ['sudact'], 'law': '113-ФЗ',
+                'ner': {'enabled': True, 'method': 'openai', 'fields': ['court'], 'openai_api_key': 'private-ner-key'}})
+    payload = json.loads(process.stdin.getvalue())
+    assert payload['config']['scraper']['sources'] == ['sudact']
+    assert payload['config']['ner']['method'] == 'openai'
+    assert payload['config']['ner']['fields'] == ['court']
+    assert jobs.snapshot()['ner_enabled']
+    assert 'private-ner-key' not in json.dumps(jobs.snapshot())
+    assert any('заглушка' in text for text in jobs.snapshot()['warnings'])

@@ -48,6 +48,24 @@ def test_request_failure_falls_back_to_browser():
     assert verified_http_text(context, URL, PAGE, TEXT, timeout_ms=1000) is None
 
 
+def test_http_comparison_ignores_only_removed_service_lines():
+    context = Mock()
+    context.request.get.return_value = response(
+        ('Краткий пересказ\nДокумент: 1/19\n' + TEXT).encode(), 'text/plain; charset=utf-8',
+    )
+    assert verified_http_text(context, URL, PAGE, TEXT, timeout_ms=1000) is not None
+
+
+def test_http_difference_diagnostic_does_not_log_document_text(caplog):
+    context = Mock()
+    context.request.get.return_value = response('Другая версия решения'.encode(), 'text/plain; charset=utf-8')
+    with caplog.at_level('DEBUG', logger='scraper.consultantplus.http_text'):
+        assert verified_http_text(context, URL, PAGE, TEXT, timeout_ms=1000) is None
+    assert 'первое различие: 0' in caplog.text
+    assert 'Другая версия решения' not in caplog.text
+    assert 'Ёлкин' not in caplog.text
+
+
 def test_never_fetches_cross_origin_or_unobserved_scheme():
     context = Mock()
     for url in ['https://external.test/text', 'file:///private/file', 'about:blank']:

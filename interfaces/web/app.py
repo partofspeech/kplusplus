@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hmac
 import json
 import os
@@ -9,33 +10,39 @@ import secrets
 import subprocess
 import sys
 import threading
+from datetime import datetime, timezone
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from scraper import DEFAULT_SOURCE, get_source
+from scraper import DEFAULT_SOURCE, SOURCE_MODULES, get_source
+from ner import FIELD_LABELS, parse_config as parse_ner_config
 
 ASSETS = Path(__file__).with_name('static')
 
 
 def validate_input(data: dict) -> dict:
-    source_name = data.get('source', DEFAULT_SOURCE)
-    source = get_source(source_name)
-    values = {'source': source_name, 'source_options': source.form_options(data)}
-    for key, label in [('law', 'Федеральный закон')]:
-        value = data.get(key)
-        if not isinstance(value, str) or not value.strip() or len(value) > 2000:
-            raise ValueError(f'Заполните поле «{label}» (до 2000 символов).')
-        values[key] = value if key == 'password' else value.strip()
-    if not isinstance(data.get('debug', False), bool):
-        raise ValueError('Некорректное значение режима отладки.')
-    values['debug'] = data.get('debug', False)
-    values['overwrite'] = data.get('overwrite', False)
-    if not isinstance(values['overwrite'], bool):
-        raise ValueError('Некорректное значение перезаписи файлов.')
+    source_keys = data.get('sources', [data.get('source', DEFAULT_SOURCE)])
+    if not isinstance(source_keys, list) or not source_keys or not all(isinstance(key, str) for key in source_keys):
+        raise ValueError('Выберите хотя бы один источник.')
+    source_keys = list(dict.fromkeys(source_keys))
+    all_options = {key: get_source(key).form_options(data) for key in source_keys}
+    values = {'sources': source_keys, 'source': source_keys[0],
+              'all_source_options': all_options, 'source_options': all_options[source_keys[0]]}
+    law = data.get('law')
+    if not isinstance(law, str) or not law.strip() or len(law) > 2000:
+        raise ValueError('Заполните поле «Федеральный закон» (до 2000 символов).')
+    values['law'] = law.strip()
+    for flag in ('debug', 'overwrite'):
+        if not isinstance(data.get(flag, False), bool):
+            raise ValueError(f'Некорректное значение {flag}.')
+        values[flag] = data.get(flag, False)
     values['transport'] = data.get('transport', 'browser')
     if values['transport'] not in ('browser', 'hybrid'):
         raise ValueError('Некорректный режим получения документов.')
+    ner = parse_ner_config(data.get('ner', {}), use_environment=False)
+    values['ner'] = {'enabled': ner.enabled, 'method': ner.method,
+                     'fields': list(ner.fields), 'openai_api_key': ner.api_key}
     return values
 
 
@@ -71,13 +78,22 @@ class Jobs:
         self.lock = threading.RLock()
         self.process = None
         self.output_root = self.root / 'output'
-        self.state = {'running': False, 'phase': 'idle', 'saved': 0, 'skipped': 0,
-                      'error': '', 'logout': None, 'directory': str(self.output_root),
-                      'save_directory': str(self.output_root), 'http_texts': 0, 'browser_texts': 0}
+        self.run_number = 0
+        self.history = []
+        self.source_counts = {}
+        self.found_counts = {}
+        self.state = self.new_state()
+
+    def new_state(self):
+        return {'running': False, 'phase': 'idle', 'saved': 0, 'skipped': 0, 'failed': 0,
+                'found': None, 'error': '', 'logout': None, 'directory': str(self.output_root),
+                'save_directory': str(self.output_root), 'http_texts': 0, 'browser_texts': 0,
+                'run_id': self.run_number, 'started_at': None, 'finished_at': None,
+                'sources': [], 'logs': [], 'warnings': [], 'ner_enabled': False}
 
     def snapshot(self):
         with self.lock:
-            return dict(self.state)
+            return {**self.state, 'logs': list(self.state['logs']), 'warnings': list(self.state['warnings'])}
 
     def select_folder(self):
         with self.lock:
@@ -100,8 +116,10 @@ class Jobs:
                 raise ValueError('Парсер уже работает.')
             output = self.output_root
             config = {
-                'scraper': {'source': values['source']},
-                'sources': {values['source']: values['source_options']},
+                'scraper': {'sources': values['sources']},
+                'sources': {key: {'name': get_source(key).Scraper.source_name, **options}
+                            for key, options in values['all_source_options'].items()},
+                'ner': values['ner'],
                 'search': {'query': values['law']},
                 'export': {'directory': str(output), 'transport': values['transport'], 'headless': not values['debug'],
                            'slow_mo_ms': 100 if values['debug'] else 0, 'overwrite': values['overwrite']},
@@ -112,14 +130,26 @@ class Jobs:
                 text=True, encoding='utf-8', cwd=str(self.root),
             )
             self.process = process
-            self.state = {'running': True, 'phase': 'starting', 'saved': 0, 'skipped': 0,
-                          'error': '', 'logout': None, 'directory': str(output),
-                          'save_directory': str(self.output_root), 'http_texts': 0, 'browser_texts': 0}
+            self.run_number += 1
+            self.source_counts = {}
+            self.found_counts = {}
+            self.state = self.new_state()
+            self.state.update(running=True, phase='starting',
+                              started_at=datetime.now(timezone.utc).isoformat(),
+                              sources=[get_source(key).Scraper.source_name for key in values['sources']],
+                              ner_enabled=values['ner']['enabled'])
+            for key in values['sources']:
+                if not get_source(key).Scraper.supported:
+                    self.state['warnings'].append(f'{get_source(key).Scraper.source_name}: источник пока не реализован и будет пропущен.')
+            if values['ner']['enabled']:
+                self.state['warnings'].append('Извлечение данных — заглушка. Документы будут сохранены без дополнительных полей.')
             try:
                 process.stdin.write(json.dumps({'config': config, 'runtime_dir': str(self.root / '.playwright')}) + '\n')
                 process.stdin.flush()
             except (OSError, BrokenPipeError):
-                self.state.update(running=False, phase='failed', error='Не удалось запустить процесс парсера.')
+                self.state.update(running=False, phase='failed', failed=1,
+                                  finished_at=datetime.now(timezone.utc).isoformat(),
+                                  error='Не удалось запустить процесс парсера.')
                 process.stdin.close()
                 process.wait()
                 raise ValueError(self.state['error']) from None
@@ -137,20 +167,38 @@ class Jobs:
                     self.state['phase'] = phase
                     if phase.startswith(('saved:', 'skipped:')):
                         key, count = phase.split(':')
-                        self.state[key] = int(count)
+                        source = event.get('source') or 'current'
+                        self.source_counts.setdefault(source, {})[key] = int(count)
+                        self.state[key] = sum(counts.get(key, 0) for counts in self.source_counts.values())
                     if phase in ('logged-out', 'logout-unconfirmed'):
                         self.state['logout'] = phase == 'logged-out'
+                elif event.get('type') == 'log':
+                    item = {'time': datetime.now().strftime('%H:%M:%S'),
+                            'level': event.get('level', 'INFO'), 'message': event.get('message', '')}
+                    self.state['logs'].append(item)
+                    del self.state['logs'][:-500]
+                    if event.get('event') == 'documents_found':
+                        self.found_counts[event.get('source') or 'current'] = event['count']
+                        self.state['found'] = sum(self.found_counts.values())
+                    if event.get('event') == 'document_error':
+                        self.state['failed'] += 1
                 elif event.get('type') == 'result':
                     self.state.update(saved=event['saved'], skipped=event['skipped'],
                                       logout=event['logout_confirmed'], phase='done',
                                       http_texts=event.get('http_texts', 0), browser_texts=event.get('browser_texts', 0))
                 elif event.get('type') == 'error':
+                    if not event.get('cancelled'):
+                        self.state['failed'] += 1
                     self.state.update(error=event['message'], phase='stopped' if event.get('cancelled') else 'failed')
         process.wait()
         with self.lock:
             if self.state['phase'] not in ('done', 'stopped', 'failed'):
-                self.state.update(phase='failed', error='Процесс неожиданно завершился. Выход из системы не подтверждён.')
+                self.state.update(phase='failed', failed=self.state['failed'] + 1,
+                                  error='Процесс неожиданно завершился. Выход из системы не подтверждён.')
             self.state['running'] = False
+            self.state['finished_at'] = datetime.now(timezone.utc).isoformat()
+            self.history.append({key: self.state[key] for key in ('run_id', 'started_at', 'finished_at', 'phase', 'saved', 'skipped', 'failed', 'sources')})
+            self.history = self.history[-50:]
             process.stdin.close()
             process.stdout.close()
 
@@ -201,6 +249,41 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.trusted():
             return self.respond(403, {'error': 'Доступ запрещён.'})
+        if self.path == '/api/documents':
+            if not self.authorized():
+                return self.respond(403, {'error': 'Доступ запрещён.'})
+            table = Path(self.server.jobs.snapshot()['directory']) / 'судакты.csv'
+            documents = []
+            try:
+                if table.exists():
+                    csv.field_size_limit(2**31 - 1)
+                    with table.open(encoding='utf-8-sig', newline='') as stream:
+                        for index, row in enumerate(csv.DictReader(stream)):
+                            if index >= 200:
+                                break
+                            if row.get('Название документа') and row.get('Источник'):
+                                documents.append({'title': row['Название документа'], 'url': row['Источник'],
+                                                  'source': row.get('Источник парсинга', '')})
+            except (OSError, csv.Error):
+                return self.respond(409, {'error': 'Таблица сейчас обновляется. Повторите открытие вкладки.'})
+            return self.respond(200, {'documents': documents})
+        if self.path in ('/api/options', '/api/runs'):
+            if not self.authorized():
+                return self.respond(403, {'error': 'Доступ запрещён.'})
+            if self.path == '/api/runs':
+                with self.server.jobs.lock:
+                    return self.respond(200, {'runs': list(self.server.jobs.history)})
+            return self.respond(200, {
+                'sources': [{'id': key, 'name': get_source(key).Scraper.source_name,
+                             'supported': get_source(key).Scraper.supported,
+                             'requires_credentials': getattr(get_source(key), 'requires_credentials', False),
+                             'mark': getattr(get_source(key), 'ui_mark', ''),
+                             'icon': getattr(get_source(key), 'ui_icon', 'file'),
+                             'description': getattr(get_source(key), 'ui_description', '')}
+                            for key in SOURCE_MODULES],
+                'default_source': DEFAULT_SOURCE,
+                'ner': {'available': False, 'fields': FIELD_LABELS},
+            })
         if self.path == '/api/status':
             if not self.authorized():
                 return self.respond(403, {'error': 'Доступ запрещён.'})

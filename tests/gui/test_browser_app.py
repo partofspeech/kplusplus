@@ -81,7 +81,7 @@ def app(tmp_path, monkeypatch):
 def fill_form(page):
     page.get_by_label('Логин источника').fill('test-client')
     page.get_by_label('Пароль', exact=True).fill('not-a-real-password')
-    page.get_by_label('Федеральный закон для поиска').fill('N-113-ФЗ')
+    page.get_by_label('Федеральный закон или запрос').fill('N-113-ФЗ')
 
 
 def test_form_folder_resume_and_overwrite(app):
@@ -90,7 +90,7 @@ def test_form_folder_resume_and_overwrite(app):
     page.get_by_role('button', name='Выбрать папку…').click()
     expect(page.locator('#save-directory')).to_have_value(str(jobs.root / 'Папка с пробелами'))
     fill_form(page)
-    page.get_by_role('button', name='Начать выгрузку').click()
+    page.get_by_role('button', name='Запустить выгрузку').click()
     expect(page.locator('#phase')).to_have_text('Выгрузка завершена')
     assert jobs.requests[-1]['debug'] is False
     assert jobs.requests[-1]['overwrite'] is False
@@ -101,12 +101,12 @@ def test_form_folder_resume_and_overwrite(app):
     expect(page.locator('#error')).to_be_hidden()
     assert opened == [jobs.output_root]
     fill_form(page)
-    page.get_by_role('button', name='Начать выгрузку').click()
+    page.get_by_role('button', name='Запустить выгрузку').click()
     expect(page.locator('#skipped')).to_have_text('1')
     fill_form(page)
     page.get_by_label('Перезаписывать существующие файлы').check()
     page.get_by_label('Режим отладки', exact=False).check()
-    page.get_by_role('button', name='Начать выгрузку').click()
+    page.get_by_role('button', name='Запустить выгрузку').click()
     expect(page.locator('#saved')).to_have_text('1')
     assert jobs.requests[-1]['debug'] is True
     assert jobs.requests[-1]['overwrite'] is True
@@ -120,9 +120,29 @@ def test_stop_waits_for_logout(app):
     page, jobs, _ = app
     jobs.wait_for_stop = True
     fill_form(page)
-    page.get_by_role('button', name='Начать выгрузку').click()
+    page.get_by_role('button', name='Запустить выгрузку').click()
     expect(page.locator('#start')).to_be_disabled()
     page.get_by_role('button', name='Остановить и выйти из системы').click()
     expect(page.locator('#phase')).to_have_text('Выгрузка остановлена')
     expect(page.locator('#logout')).to_have_text('Выход из источника подтверждён.')
     expect(page.locator('#start')).to_be_enabled()
+
+
+def test_source_selection_and_ner_stub_settings_reach_backend(app):
+    from playwright.sync_api import expect
+    page, jobs, _ = app
+    page.get_by_role('checkbox', name='Судакт.ру', exact=True).check()
+    page.get_by_label('Извлекать структурированные данные').check()
+    page.get_by_label('С использованием OpenAI').check()
+    page.get_by_label('Регион', exact=True).check()
+    expect(page.locator('#api-key')).to_be_disabled()
+    expect(page.locator('#ner-note')).to_contain_text('пока не реализовано')
+    fill_form(page)
+    page.get_by_role('button', name='Запустить выгрузку').click()
+    expect(page.locator('#saved')).to_have_text('1')
+    assert jobs.requests[-1]['sources'] == ['consultantplus', 'sudact']
+    assert jobs.requests[-1]['ner']['enabled'] is True
+    assert jobs.requests[-1]['ner']['method'] == 'openai'
+    assert 'region' in jobs.requests[-1]['ner']['fields']
+    page.get_by_role('tab', name='Найденные акты').click()
+    expect(page.locator('#journal-documents')).to_contain_text('Тестовый документ')

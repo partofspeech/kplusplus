@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 def run_export(config: Config, runtime_dir: Path, *,
                cancelled: Callable[[], bool] | None = None) -> dict:
     """Запустить выбранный источник с новой сессией браузера."""
+    if config.ner.enabled:
+        logger.warning('Извлечение данных пока не реализовано. Документы будут сохранены без дополнительных полей.',
+                       extra={'phase': 'ner-unavailable'})
     selected = []
     skipped_sources = []
     for selection in config.sources:
@@ -63,7 +66,7 @@ def run_export(config: Config, runtime_dir: Path, *,
 def run_source(config: Config, runtime_dir: Path, scraper_class,
                cancelled: Callable[[], bool] | None) -> dict:
     """Каждый источник получает отдельную свежую сессию браузера."""
-    logger.debug('Запуск источника: %s', config.source_name, extra={'phase': 'starting'})
+    logger.debug('Запуск источника: %s', config.source_name, extra={'phase': 'starting', 'source': config.source})
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=config.headless, slow_mo=config.slow_mo_ms)
         try:

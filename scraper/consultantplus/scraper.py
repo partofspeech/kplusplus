@@ -49,7 +49,8 @@ class ConsultantPlusScraper:
         """Выгрузить документы К+ и завершить авторизованную сессию."""
         try:
             urls = self.collect_urls()
-            logger.debug('Найдено ссылок на акты: %d', len(urls))
+            logger.debug('Найдено ссылок на акты: %d', len(urls),
+                         extra={'event': 'documents_found', 'count': len({document_key(url) for url in urls}), 'source': self.config.source})
             saved, skipped = self.export_related(urls, output_dir)
         finally:
             logout_confirmed = self.session.logout_all()
@@ -78,7 +79,7 @@ class ConsultantPlusScraper:
     def _status(self, phase: str) -> None:
         if phase != "logged-out":
             self._check_cancelled()
-        logger.debug('Этап: %s', phase, extra={'phase': phase})
+        logger.debug('Этап: %s', phase, extra={'phase': phase, 'source': self.config.source})
         if self.status_path:
             self.status_path.write_text(phase + "\n", encoding="utf-8")
 
@@ -351,7 +352,8 @@ class ConsultantPlusScraper:
                     logger.debug("Сохранён документ: %s; файл: %s", key, filename)
                     self._status(f"saved:{saved}")
                 except PlaywrightTimeoutError:
-                    logger.debug("Таймаут документа, пропуск: %s", key, exc_info=True)
+                    logger.warning('Таймаут документа, пропуск: %s', key,
+                                   extra={'event': 'document_error', 'document': key, 'source': self.config.source})
                     skipped += 1
                     self._status(f"skipped:{skipped}")
                 finally:

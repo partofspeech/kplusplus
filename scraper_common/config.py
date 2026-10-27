@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from scraper import DEFAULT_SOURCE, get_source
+from ner import NerConfig, parse_config as parse_ner_config
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,7 @@ class Config:
     source_name: str = ""
     sources: tuple[SourceConfig, ...] = ()
     source_names: dict[str, str] = field(default_factory=dict)
+    ner: NerConfig = field(default_factory=NerConfig)
 
 
 def load_config(path: Path) -> Config:
@@ -54,6 +56,9 @@ def config_from_mapping(raw: dict, *, use_environment: bool = True) -> Config:
         secrets.extend(options.secrets)
     if len({item.name for item in selections}) != len(selections):
         raise ValueError('Названия источников должны отличаться.')
+    ner = parse_ner_config(raw.get('ner', {}), use_environment=use_environment)
+    if ner.api_key:
+        secrets.append(ner.api_key)
     first = selections[0]
     source_names = {item.key: item.name for item in selections}
     for key, settings in raw.get('sources', {}).items():
@@ -75,5 +80,5 @@ def config_from_mapping(raw: dict, *, use_environment: bool = True) -> Config:
         query=str(search.get('query', '')), directory=Path(str(export.get('directory', 'output'))),
         headless=bool(export.get('headless', False)), slow_mo_ms=int(export.get('slow_mo_ms', 100)),
         timeout_ms=int(export.get('timeout_seconds', 45)) * 1000,
-        transport=transport, overwrite=export.get('overwrite', False),
+        transport=transport, overwrite=export.get('overwrite', False), ner=ner,
     )

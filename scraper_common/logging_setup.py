@@ -2,7 +2,7 @@
 from contextlib import contextmanager
 import logging
 
-LOGGER_NAMES = ('scraper', 'scraper_common', 'interfaces')
+LOGGER_NAMES = ('scraper', 'scraper_common', 'interfaces', 'ner')
 
 
 class SecretFormatter(logging.Formatter):

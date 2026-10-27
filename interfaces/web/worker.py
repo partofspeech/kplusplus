@@ -9,7 +9,7 @@ from pathlib import Path
 
 from scraper_common.config import config_from_mapping
 from scraper.runner import run_export
-from scraper_common.logging_setup import LOGGER_NAMES
+from scraper_common.logging_setup import LOGGER_NAMES, SecretFormatter
 
 
 def main():
@@ -31,7 +31,12 @@ def main():
         def emit(self, record):
             phase = getattr(record, 'phase', None)
             if phase:
-                emit('status', phase=phase)
+                emit('status', phase=phase, source=getattr(record, 'source', None))
+            if record.levelno < logging.INFO and payload['config'].get('export', {}).get('headless', True):
+                return
+            emit('log', message=self.format(record), level=record.levelname,
+                 event=getattr(record, 'event', None), count=getattr(record, 'count', None),
+                 document=getattr(record, 'document', None), source=getattr(record, 'source', None))
 
     # UI-specific adaptation stays here; the scraper uses ordinary logging.
     handler = StatusHandler()
@@ -44,6 +49,7 @@ def main():
     try:
         config = config_from_mapping(payload['config'], use_environment=False)
         secrets = config.secrets
+        handler.setFormatter(SecretFormatter(secrets))
         result = run_export(config, Path(payload['runtime_dir']), cancelled=stopped.is_set)
         emit('result', **result)
     except Exception as error:

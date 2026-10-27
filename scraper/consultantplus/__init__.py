@@ -4,3 +4,8 @@ from .scraper import ConsultantPlusScraper
 
 Scraper = ConsultantPlusScraper
 from .identity import document_key, normalize_legacy_row
+
+requires_credentials = True
+
+ui_mark = 'К+'
+ui_description = 'Требуется подписка'

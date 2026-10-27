@@ -27,3 +27,12 @@ manual_intervention_timeout_seconds = 300
 
 [sources.sudact]
 name = "Судакт.ру"
+
+
+# Извлечение данных пока является заглушкой: новые колонки не создаются,
+# запросы к OpenAI не отправляются. Эти настройки зарезервированы для реализации.
+[ner]
+enabled = false
+method = "simple" # simple | openai
+fields = ["court", "hearing_date", "defendant", "plaintiff", "decision"]
+openai_api_key = "${OPENAI_API_KEY}" # ключ сейчас не требуется и не используется

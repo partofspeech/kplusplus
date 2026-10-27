@@ -1,56 +1,99 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="app-token" content="__APP_TOKEN__">
-  <title>Kplusplus · Судебная практика</title>
-  <link rel="stylesheet" href="/style.css">
-  <script src="/app.js" defer></script>
+  <title>К++ · Сборщик судебных актов</title>
+  <link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
 </head>
 <body>
-  <div class="shell">
-    <header><a class="brand" href="/" aria-label="Kplusplus — главная">k<span>++</span></a><span class="local"><i></i> Локальное приложение</span></header>
-    <main>
-      <div class="layout">
-        <section class="card form-card" aria-labelledby="settings-title">
-          <div class="section-heading"><span class="step">01</span><h2 id="settings-title">Параметры поиска</h2></div>
-          <form id="parser-form">
-            <fieldset id="settings">
-              <label for="login">Логин источника</label>
-              <input id="login" name="login" autocomplete="username" placeholder="Телефон или логин" maxlength="2000">
-              <label for="password">Пароль</label>
-              <div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Ваш пароль" maxlength="2000"><button type="button" id="show-password" aria-label="Показать пароль" aria-pressed="false">Показать</button></div>
-              <p class="hint">Пароль используется только для текущего запуска и не сохраняется приложением.</p>
-              <label for="law">Федеральный закон для поиска</label>
-              <textarea id="law" name="law" rows="3" required maxlength="2000" placeholder='Например: Федеральный закон от 25.07.2002 N 113-ФЗ «Об альтернативной гражданской службе»'></textarea>
-              <p class="hint">Укажите номер, дату и название закона для более точного поиска.</p>
-              <label for="save-directory">Папка для сохранения</label>
-              <input id="save-directory" readonly aria-describedby="save-hint" value="Загрузка…">
-              <button type="button" id="choose-folder" class="secondary choose-folder">Выбрать папку…</button>
-              <p class="hint" id="save-hint">Документы и общая таблица сохраняются прямо в выбранную папку. При повторном запуске готовые документы пропускаются.</p>
-              <label class="debug-option" for="overwrite"><span><strong>Перезаписывать существующие файлы</strong><small>Повторно сохранить документы и обновить их строки в таблице</small></span><input id="overwrite" type="checkbox" role="switch"></label>
-              <label class="debug-option" for="hybrid"><span><strong>Пробный HTTP-режим</strong><small>Проверять получение полного текста через HTTP</small></span><input id="hybrid" type="checkbox" role="switch"></label>
-              <p class="hint">При неполном ответе текст берётся из браузера. Авторизация и выход выполняются через Chromium.</p>
-              <label class="debug-option" for="debug"><span><strong>Режим отладки</strong><small>Показывать окно Chromium во время работы</small></span><input id="debug" name="debug" type="checkbox" role="switch"></label>
-              <p class="hint">Если потребуется код входа или CAPTCHA, включите отладку и повторите запуск.</p>
-            </fieldset>
-            <button class="primary" type="submit" id="start">Начать выгрузку <span aria-hidden="true">↗</span></button>
-          </form>
+<svg class="icon-library" aria-hidden="true"><defs>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 17 17 7M7 7h10v10"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7V5h6l2 3h10v12H3V7Z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l5 5v13H6V3Z M14 3v6h5"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 9a8 8 0 0 0-14-4L3 8m0-5v5h5M4 15a8 8 0 0 0 14 4l3-3m0 5v-5h-5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m12 3 10 18H2L12 3Z M12 9v5m0 3v.2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4m-4 4v3"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-scales" viewBox="0 0 24 24"><path d="M12 3v18M7 21h10M3 7h18M6 7l-4 8h8L6 7Zm12 0-4 8h8l-4-8Z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="m6 3 15 9-15 9V3Z"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m7 6-6 6 6 6m10-12 6 6-6 6M14 3l-4 18"/></symbol>
+  <symbol id="i-network" viewBox="0 0 24 24"><path d="M3 3l18 18M3 9a15 15 0 0 1 18 0M6 13a10 10 0 0 1 12 0m-9 4a5 5 0 0 1 6 0m-3 4v.1"/></symbol>
+</defs></svg>
+<div class="app-shell">
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="К++ — главная"><span>К++</span></a>
+    <span class="brand-description">Правозащитный сборщик судебных актов</span>
+    <nav aria-label="Основная навигация">
+      <button type="button" class="nav-button active" id="nav-export">Выгрузка</button>
+      <button type="button" class="nav-button" id="nav-runs">Запуски</button>
+      <button type="button" class="nav-button" id="nav-settings">Настройки</button>
+      <button type="button" class="nav-button" id="nav-help">Справка <svg class="icon"><use href="#i-arrow"/></svg></button>
+    </nav>
+  </header>
+  <main class="workspace">
+    <form id="parser-form" class="configuration">
+      <fieldset id="settings">
+        <section class="panel numbered" aria-labelledby="sources-title">
+          <span class="number-sticker" aria-hidden="true">01</span>
+          <h2 id="sources-title">Источники</h2><p class="section-caption">Выберите, где искать судебные акты</p>
+          <div id="source-cards" class="source-cards" aria-live="polite"><p class="muted">Загружаем источники…</p></div>
+          <div id="account-notice" class="notice account-notice"><svg class="icon"><use href="#i-alert"/></svg><p>Если у вас <strong>обычная учётная запись</strong>, завершите работу с ней в других браузерах и на других устройствах перед запуском. Во время выгрузки не используйте её параллельно.</p></div>
+          <div id="credentials" class="credentials">
+            <div><label for="login" id="login-label">Логин источника</label><div class="input-with-icon"><svg class="icon"><use href="#i-user"/></svg><input id="login" aria-label="Логин источника" autocomplete="username" placeholder="Логин" maxlength="2000"></div></div>
+            <div><label for="password">Пароль</label><div class="input-with-icon password-wrap"><svg class="icon"><use href="#i-lock"/></svg><input id="password" type="password" autocomplete="current-password" placeholder="Ваш пароль" maxlength="2000"><button type="button" id="show-password" class="icon-button" aria-label="Показать пароль" aria-pressed="false"><svg class="icon"><use href="#i-eye"/></svg></button></div></div>
+          </div>
         </section>
-        <section class="card result-card" aria-labelledby="result-title">
-          <div class="section-heading"><span class="step">02</span><h2 id="result-title">Результат</h2><span id="badge">Ожидание</span></div>
-          <div class="status-block" aria-live="polite"><div class="status-icon" id="status-icon" aria-hidden="true">↓</div><h3 id="phase">Всё готово к запуску</h3><p id="description">Документы появятся здесь после начала выгрузки.</p></div>
-          <div class="counters"><div><strong id="saved">0</strong><span>Сохранено актов</span></div><div><strong id="skipped">0</strong><span>Пропущено</span></div></div>
-          <p id="error" class="error" role="alert" hidden></p>
-          <p id="transport-summary" class="hint" aria-live="polite"></p>
-          <p id="logout" class="hint" aria-live="polite"></p>
-          <div class="folder"><span class="eyebrow">ПАПКА ЗАГРУЗОК</span><p id="directory">Загрузка…</p><button id="open-folder" class="secondary" type="button">Открыть папку <span aria-hidden="true">↗</span></button></div>
-          <button id="stop" class="stop" type="button" hidden>Остановить и выйти из системы</button>
+        <section class="panel numbered" aria-labelledby="search-title">
+          <span class="number-sticker" aria-hidden="true">02</span><h2 id="search-title">Параметры поиска</h2>
+          <label for="law">Федеральный закон или запрос</label>
+          <textarea id="law" rows="2" required maxlength="2000" placeholder='113-ФЗ «Об альтернативной гражданской службе»'></textarea>
         </section>
+        <section class="panel numbered ner-panel" aria-labelledby="ner-title">
+          <span class="number-sticker" aria-hidden="true">03</span><h2 id="ner-title">Извлечение данных <span class="beta">β</span></h2>
+          <label class="switch-row ner-enable" for="ner-enabled"><input id="ner-enabled" type="checkbox" role="switch"><span>Извлекать структурированные данные</span></label>
+          <fieldset id="ner-options" disabled>
+            <span class="field-label">Способ извлечения</span>
+            <div class="method-options"><label class="method-choice"><input type="radio" name="ner-method" value="simple" checked><span>Простое извлечение<small>Без внешнего сервиса</small></span></label><label class="method-choice"><input type="radio" name="ner-method" value="openai"><span class="ai-mark" aria-hidden="true">✳</span><span>С использованием OpenAI</span></label></div>
+            <div class="extraction-details"><div><span class="field-label">Какие колонки извлекать</span><div id="ner-fields" class="ner-fields"></div></div><div class="api-settings"><label for="api-key">API key OpenAI <span class="information" title="Интеграция пока не реализована">i</span></label><div class="input-with-icon"><svg class="icon"><use href="#i-lock"/></svg><input id="api-key" type="password" disabled placeholder="Пока не требуется" autocomplete="off"></div><p class="muted">Ключ вводить пока не нужно. Интеграция ещё не реализована.</p></div></div>
+          </fieldset>
+          <p class="stub-note" id="ner-note">Блок в разработке. Сейчас сохраняются тексты документов и основная таблица.</p>
+        </section>
+        <section class="panel numbered" id="advanced-panel" tabindex="-1" aria-labelledby="advanced-title">
+          <span class="number-sticker" aria-hidden="true">04</span><h2 id="advanced-title">Дополнительные настройки</h2>
+          <div class="advanced-options">
+            <label class="advanced-choice" for="overwrite"><span><svg class="icon"><use href="#i-refresh"/></svg>Перезаписывать результаты <span class="information" title="Заново сохранить файлы и обновить соответствующие строки таблицы">i</span></span><input id="overwrite" aria-label="Перезаписывать существующие файлы" type="checkbox" role="switch"></label>
+            <label class="advanced-choice" for="debug"><span><svg class="icon"><use href="#i-code"/></svg>Режим отладки <span class="information" title="Показывать Chromium и подробные сообщения о ходе работы">i</span></span><input id="debug" aria-label="Режим отладки" type="checkbox" role="switch"></label>
+          </div>
+        </section>
+      </fieldset>
+      <div class="destination"><svg class="icon"><use href="#i-folder"/></svg><input id="save-directory" aria-label="Папка для сохранения" readonly value="Загрузка…"><button type="button" id="choose-folder">Выбрать папку…</button></div>
+      <button class="start-button" type="submit" id="start" disabled><svg class="icon"><use href="#i-play"/></svg>Запустить выгрузку</button>
+    </form>
+    <section class="panel result-panel" aria-labelledby="run-title">
+      <div class="run-heading"><span class="status-dot" id="status-dot" aria-hidden="true"></span><div><h2 id="run-title">Новая выгрузка</h2><p id="run-subtitle" class="muted">Настройте поиск и нажмите «Запустить выгрузку»</p></div><details class="actions-menu"><summary>··· <span>Действия</span>⌄</summary><div><button id="copy-log" type="button">Скопировать лог</button><button id="action-help" type="button">Как продолжить после сбоя</button></div></details></div>
+      <div class="status-heading"><h1 id="phase">Готово к запуску</h1><span id="elapsed" class="elapsed">Ещё не запускалась</span></div>
+      <p id="description" class="status-description">Документы будут сохранены в выбранную папку.</p>
+      <div class="progress-track"><progress id="progress" max="100" value="0" aria-label="Ход выгрузки"></progress><strong id="progress-label">Ожидание</strong></div>
+      <p class="progress-caption">Сохранено <span id="saved-summary">0</span> · пропущено <span id="skipped">0</span><span id="transport-summary"></span></p>
+      <div class="metrics"><div><svg class="icon"><use href="#i-file"/></svg><strong id="found">—</strong><span>найдено</span></div><div><svg class="icon"><use href="#i-download"/></svg><strong id="saved">0</strong><span>скачано</span></div><div><svg class="icon"><use href="#i-refresh"/></svg><strong id="queued">—</strong><span>в очереди</span></div><div class="error-metric"><svg class="icon"><use href="#i-alert"/></svg><strong id="failed-count">0</strong><span>ошибок</span></div></div>
+      <div class="stop-area"><button id="stop" class="stop-button" type="button" hidden><svg class="icon"><use href="#i-stop"/></svg>Остановить и выйти из системы</button><p id="logout" class="muted" aria-live="polite"></p></div>
+      <p id="error" class="error-message" role="alert" hidden></p><div id="run-warnings" class="run-warnings"></div>
+      <div class="journal"><div class="journal-tabs" role="tablist" aria-label="Результаты выгрузки"><button id="tab-log" class="selected" type="button" role="tab" aria-selected="true" aria-controls="journal-log">Лог выгрузки</button><button id="tab-errors" type="button" role="tab" aria-selected="false" aria-controls="journal-errors">Ошибки <span id="errors-tab-count">(0)</span></button><button id="tab-documents" type="button" role="tab" aria-selected="false" aria-controls="journal-documents">Найденные акты</button></div>
+        <div id="journal-log" class="journal-content" role="tabpanel" aria-labelledby="tab-log" aria-live="polite"><p class="empty-state">Здесь появится история работы.<br>Пока можно настроить первую выгрузку.</p></div>
+        <div id="journal-errors" class="journal-content" role="tabpanel" aria-labelledby="tab-errors" hidden></div>
+        <div id="journal-documents" class="journal-content" role="tabpanel" aria-labelledby="tab-documents" hidden></div>
       </div>
-      <footer><span>DOCX-документы + таблица CSV</span><span>Объём выгрузки зависит от доступа вашей учётной записи.</span></footer>
-    </main>
-  </div>
-</body>
-</html>
+      <div class="notice bottom-notice"><svg class="icon"><use href="#i-info"/></svg><div><p>Выгрузка может занять несколько часов.</p><p>Можно закрыть вкладку — процесс продолжится.</p></div><button id="open-folder" class="folder-button" type="button"><svg class="icon"><use href="#i-folder"/></svg>Открыть папку</button></div>
+      <p id="directory" class="directory-note"></p>
+    </section>
+  </main>
+  <footer>К++ <span>Документы DOCX · общая таблица CSV · продолжение после сбоя</span><span class="local-label"><i></i> Работает на вашем компьютере</span></footer>
+</div>
+<dialog id="help-dialog"><div class="dialog-heading"><h2>Как пользоваться К++</h2><button type="button" class="dialog-close" aria-label="Закрыть справку">×</button></div><ol><li>Выберите источники и введите реквизиты, если они нужны.</li><li>Укажите закон и папку для сохранения.</li><li>Нажмите «Запустить выгрузку» и дождитесь завершения.</li></ol><p>Чтобы продолжить после сбоя, выберите ту же папку и не включайте перезапись. Уже сохранённые акты будут пропущены.</p><p>Кнопка остановки завершает текущее действие и выполняет выход. Настоящая пауза пока не поддерживается.</p><p>Судакт.ру и извлечение данных пока не реализованы. К+ выгружает текущий доступный раздел высших судов.</p><p>Закрытие окна терминала остановит приложение. Пароль из формы используется только в этом запуске.</p></dialog>
+<dialog id="runs-dialog"><div class="dialog-heading"><h2>Запуски этого сеанса</h2><button type="button" class="dialog-close" aria-label="Закрыть список запусков">×</button></div><div id="runs-list"></div><p class="muted">Список хранится до закрытия приложения. Скачанные файлы и прогресс сохраняются в выбранной папке.</p></dialog>
+</body></html>
